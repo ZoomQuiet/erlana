@@ -3,7 +3,7 @@
 
 = Summary =
 
-Erlana is created recently. And there is still no source code in repository.
+Erlana project is created recently. And there is still no source code in repository.
 
 To know plan of Erlana, see http://erlana.googlecode.com/svn/trunk/doc/.
 
@@ -17,3 +17,7 @@ There are some erlang web servers, like inets, yaws, mochiweb, etc. We choose in
 
 The following link is an introduction:
   * http://erlana.googlecode.com/svn/trunk/doc/Erlang%20Inets/
+  
+== [2007-11-18] Erlana project is created ==
+
+See http://groups.google.com/group/erlang-china/browse_thread/thread/a6173d60882413ed
