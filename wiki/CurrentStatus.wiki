@@ -1,0 +1,19 @@
+#summary Current Development Status
+#labels Featured,Phase-Design
+
+= Summary =
+
+Erlana is created recently. And there is still no source code in repository.
+
+To know plan of Erlana, see http://erlana.googlecode.com/svn/trunk/doc/.
+
+= Details =
+
+Here we show you where we are going.
+
+== Erlang Inets ===
+
+There are some erlang web servers, like inets, yaws, mochiweb, etc. We choose inets.
+
+The following link is an introdution:
+  * http://erlana.googlecode.com/svn/trunk/doc/Erlang%20Inets/
