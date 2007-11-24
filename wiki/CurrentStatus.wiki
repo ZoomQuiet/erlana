@@ -3,7 +3,8 @@
 
 = Summary =
 
-Erlana project is created recently. And there is still no source code in repository. To get more details, see http://code.google.com/p/erlana/issues/list.
+Erlana project is created recently. And there is still no source code in repository.
+To get more details, see http://code.google.com/p/erlana/issues/list.
 
 = Details =
 
