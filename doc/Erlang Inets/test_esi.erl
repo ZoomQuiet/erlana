@@ -10,6 +10,7 @@ test(Env, Input) ->
 	"Content-type: text/html\r\n\r\n",
 	"<HTML><HEAD><TITLE>Example</TITLE></HEAD>\r\n",
 	"<BODY>\n",
+	"<B>Self:</B> ", io_lib:format("~p", [self()]), "<BR>\n",
 	"<B>Environment:</B> ", io_lib:format("~p",[Env]), "<BR>\n",
 	"<B>Input:</B> ", Input, "<BR>\n",
 	"<B>Parsed Input:</B> ", io_lib:format("~p",[httpd:parse_query(Input)]), "\n",
