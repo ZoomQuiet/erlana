@@ -70,6 +70,7 @@ do_test_read(Fd, Count) ->
 		{Fd1, Count};
 	{Fd1, Msg1}->
 		[io:format("~p~n", [X]) || X <- Msg1],
+		io:format("Fd: ~p~n", lists:
 		do_test_read(Fd1, Count+length(Msg1));
 	_ ->
 		{Fd, error}
