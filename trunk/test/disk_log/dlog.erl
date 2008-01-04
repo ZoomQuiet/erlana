@@ -57,7 +57,7 @@ close(Log) ->
     disk_log:close(Log).
 
 test_write() ->
-	{ok, Fd} = open("test.log", 1024, 1024),
+	{ok, Fd} = open("test.log", 256, 3),
 	ok = write(Fd, "haha"),
 	ok = write(Fd, "good"),
 	ok = write(Fd, "erlang"),
@@ -70,7 +70,6 @@ do_test_read(Fd, Count) ->
 		{Fd1, Count};
 	{Fd1, Msg1}->
 		[io:format("~p~n", [X]) || X <- Msg1],
-		io:format("Fd: ~p~n", lists:
 		do_test_read(Fd1, Count+length(Msg1));
 	_ ->
 		{Fd, error}
