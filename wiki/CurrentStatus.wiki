@@ -11,6 +11,10 @@ To get more details, see http://code.google.com/p/erlana/issues/list.
 
 Here we show you where we are going.
 
+== [2008-2-20] Implement a basic log system ==
+
+See issue #5.
+
 == [2007-11-21] Erlang Inets ===
 
 There are some erlang web servers, like inets, yaws, mochiweb, etc. We choose inets.
