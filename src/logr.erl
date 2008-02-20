@@ -4,9 +4,9 @@
 -include_lib("kernel/include/file.hrl").
 
 %% export functions
--export([open/2, open/3, bchunk/2, bget/2, bcount/1, btell/1, blist/1, position/2, reset/1, close/1]).
--export([get/3, tell/2, reset/2, close/2]).
--export([i/1, repair/3, repairIndex/1]).
+-export([open/2, open/3, bchunk/2, bget/2, bcount/1, btell/1, blist/1, position/2, reset/1, i/1, close/1]).
+-export([get/3, tell/2, reset/2, i/2, close/2]).
+-export([repair/3, repairIndex/1]).
 
 %% required by 'gen_server' behaviour
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
@@ -36,7 +36,7 @@
 %%
 open(Path, Client) ->
 	open(Path, Client, false).
-		
+
 %% FPermanent = true | false
 open(Path, Client, FPermanent) ->
 	Log = ?LogRServer(Path, Client),
@@ -83,7 +83,7 @@ get(Path, Client, N) ->
 		{ok, Acc, _FromWhere} ->
 			{ok, lists:reverse(Acc)};
 		_Fail ->
-			{ok, _Log} = open(Path, Client, true),
+			open(Path, Client, true),
 			catch (bget(Log, N))
 	end.
 
@@ -127,7 +127,7 @@ reset(Path, Client) ->
 	case catch (position(Log, Position)) of
 		ok -> ok;
 		_Fail ->
-			{ok, _Log} = open(Path, Client, true),
+			open(Path, Client, true),
 			catch (position(Log, Position))
 	end.
 
@@ -144,7 +144,7 @@ tell(Path, Client) ->
 		{ok, Position} ->
 			{ok, Position};
 		_Fail ->
-			{ok, _Log} = open(Path, Client, true),
+			open(Path, Client, true),
 			catch (btell(Log))
 	end.
 
@@ -154,6 +154,9 @@ tell(Path, Client) ->
 %%
 i(Log) ->
 	gen_server:call(Log, i).
+	
+i(Path, Client) ->
+	i(?LogRServer(Path, Client)).
 
 %%
 %% open: Close log file.
@@ -404,6 +407,7 @@ init({Path, Client, FPermanent}) ->
 %% terminate: Termiate server.
 %%
 terminate(_Reason, State) ->
+	?MSG("Termiating ~p ...~n", [State#state.path]),
 	case State#state.fdPos of
 		undefined ->
 			ok;
@@ -443,9 +447,9 @@ handle_call(tell, _From, State) ->
 %% return: ok | {error, Reason}
 %%
 handle_call({position, NewPosition}, _From, State) ->
-	Return = positionTo(NewPosition, State),
-	if element(2, Return) =:= ok -> savePosition(State); true -> ok end,
-	Return;
+	{reply, Ret, State2} = positionTo(NewPosition, State),
+	if Ret =:= ok -> savePosition(State2); true -> ok end,
+	{reply, Ret, State2};
 
 %%
 %% i: Information of a log file.
