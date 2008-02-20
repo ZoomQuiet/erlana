@@ -55,10 +55,16 @@ trunc(Log) ->
 %%
 blog(Log, Bin) ->
 	gen_server:call(Log, {blog, Bin}).
-	
+
 put(Path, Bin) ->
 	Log = ?LogWServer(Path),
-	gen_server:call(Log, {blog, Bin}).
+	case catch(gen_server:call(Log, {blog, Bin})) of
+		ok ->
+			ok;
+		_Fail ->
+			logw:open(Path, ?SUBLOG_MAX_BYTES),
+			catch(gen_server:call(Log, {blog, Bin}))
+	end.
 
 %%
 %% sync: Update index, and write to disk (if FSyncIoDev is true)
