@@ -50,6 +50,27 @@ You know, At the same time a log file may read by many applications. And these a
 
 In one word, a client means a "read position".
 
+To get current "read position" of a client, you can use the following code:
+{{{
+logr:tell("Logfile", "Client1").
+}}}
+
+You will get a result like this:
+{{{
+{ok, {position, {1, 26}}
+}}}
+
+And, you can seek "read position" to somewhere. For example:
+{{{
+logr:position("Logfile", "Client1", #position{fileNo=1, offset=26}).
+%% This is same as: logr:position("Logfile", "Client", {position, 1, 26}).
+}}}
+
+And, you can seek "read position" to start of log file, by using logr:reset/2:
+{{{
+logr:reset("Logfile", "Client1").
+}}}
+
 = Source code =
 
  * [http://code.google.com/p/erlana/source/browse/trunk/src/logr.erl logr.erl]
