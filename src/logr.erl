@@ -4,8 +4,8 @@
 -include_lib("kernel/include/file.hrl").
 
 %% export functions
--export([open/2, open/3, bchunk/2, bget/2, bcount/1, btell/1, blist/1, position/2, reset/1, i/1, close/1]).
--export([get/3, tell/2, reset/2, i/2, close/2]).
+-export([open/2, open/3, bget/2, bcount/1, btell/1, blist/1, position/2, reset/1, i/1, close/1]).
+-export([get/3, tell/2, position/3, reset/2, i/2, close/2]).
 -export([repair/3, repairIndex/1]).
 
 %% required by 'gen_server' behaviour
@@ -30,6 +30,10 @@
 %% ------------------------------------------------------------------------------
 %% export functions
 
+-compile({inline,{bget,2}}).
+-compile({inline,{btell,1}}).
+-compile({inline,{position,2}}).
+
 %%
 %% open: Open log file.
 %% return: {ok, Log} | {error, Reason}
@@ -53,61 +57,49 @@ open(Path, Client, FPermanent) ->
 	end.
 
 %%
-%% bchunk: Read log data
-%% return: {ok, Acc, FromWhere} | {need_repair, {FileNo, Offset}}
-%%	eof = (length(Acc) == 0)
-%%	Bins = lists:reverse(Acc)
-%%
-bchunk(Log, N) ->
-	gen_server:call(Log, {bchunk, N}).
-
-%%
 %% bget: Read log data
-%% return: {ok, Bins} | {need_repair, {FileNo, Offset}}
+%% return: {ok, Bins, FromWhere} | eof | {need_repair, {FileNo, Offset}}
 %%
 bget(Log, N) ->
-	case bchunk(Log, N) of
-		{ok, Acc, _FromWhere} ->
-			{ok, lists:reverse(Acc)};
-		Fail ->
-			Fail
-	end.
+	gen_server:call(Log, {get, N}).
 
 %%
 %% get: Read log data
-%% return: {ok, Bins} | {need_repair, {FileNo, Offset}}
+%% return: {ok, Bins, FromWhere} | {need_repair, {FileNo, Offset}}
 %%
 get(Path, Client, N) ->
 	Log = ?LogRServer(Path, Client),
-	case catch (bchunk(Log, N)) of
-		{ok, Acc, _FromWhere} ->
-			{ok, lists:reverse(Acc)};
+	case catch (bget(Log, N)) of
+		{ok, Bins, FromWhere} ->
+			{ok, Bins, FromWhere};
+		eof ->
+			eof;
 		_Fail ->
 			open(Path, Client, true),
 			catch (bget(Log, N))
 	end.
 
 %%
-%% count: Count of a log file.
+%% count: Count rest entries of a log file.
 %% return: {ok, Count} | {error, OkCount, Reason}
 %%
 bcount(Log) ->
-	case bchunk(Log, -1) of
+	case bget(Log, -1) of
 		{ok, Bins, _FromWhere} ->
 			{ok, length(Bins)};
-		_Fail ->
+		_Eof ->
 			{ok, 0}
 	end.
 
 %%
-%% list: List a log file.
-%% return: <LogHistory> = [binary()]
+%% list: List rest entries of a log file.
+%% return: LogHistory = [binary()]
 %%
 blist(Log) ->
 	case bget(Log, -1) of
-		{ok, Bins} ->
+		{ok, Bins, _FromWhere} ->
 			Bins;
-		_Fail ->
+		_Eof ->
 			[]
 	end.
 
@@ -118,18 +110,20 @@ blist(Log) ->
 position(Log, Position) ->
 	gen_server:call(Log, {position, Position}).
 
-reset(Log) ->
-	gen_server:call(Log, {position, #position{fileNo=1, offset=0}}).
-
-reset(Path, Client) ->
+position(Path, Client, Position) ->
 	Log = ?LogRServer(Path, Client),
-	Position = #position{fileNo=1, offset=0},
 	case catch (position(Log, Position)) of
 		ok -> ok;
 		_Fail ->
 			open(Path, Client, true),
 			catch (position(Log, Position))
 	end.
+
+reset(Log) ->
+	position(Log, #position{fileNo=1, offset=0}).
+
+reset(Path, Client) ->
+	position(Path, Client, #position{fileNo=1, offset=0}).
 
 %%
 %% tell: Tell current position.
@@ -220,10 +214,10 @@ readIndex(_Path, <<>>, _FileNo, Acc) ->
 %% return: no_update | {update, State} | {need_repair, {FileNo, Offset}}
 %%
 update(FileNo, OldSize, State) ->
-	%% ?MSG("Update ~p: fileNo=~p, fileSize=~p~n", [State#state.path, FileNo, OldSize]),
+	%% ?MSG("Update ~p: fileNo=~p, fileSize=~p~n", [?SELF, FileNo, OldSize]),
 	case catch (logw:sync(State#state.logW, false)) of
 		{ok, {FileNoCur, FileSizeCur, NewVersion}} ->
-			%% ?MSG("Sync ~p: fileNoCur=~p, fileSize=~p, version=~p~n", [State#state.path, FileNoCur, FileSizeCur, NewVersion]),
+			%% ?MSG("Sync ~p: fileNoCur=~p, fileSize=~p, version=~p~n", [?SELF, FileNoCur, FileSizeCur, NewVersion]),
 			if State#state.version =:= NewVersion ->
 				if FileNoCur =:= FileNo ->
 					if
@@ -268,7 +262,7 @@ savePosition(State) ->
 			ok;
 		FdPos ->
 			#state{fileNo=FileNo, offset=Offset} = State,
-			?MSG("savePosition ~p: fileNo=~p, offset=~p~n", [State#state.path, FileNo, Offset]),
+			?MSG("SavePosition ~p: fileNo=~p, offset=~p~n", [?SELF, FileNo, Offset]),
 			ok = file:pwrite(FdPos, 0, <<?PosFileTag:32, FileNo:32, Offset:64>>)
 	end.
 
@@ -342,7 +336,7 @@ readSingle(FdSubLog, RestSize, N, Acc) ->
 %%
 read(N, Acc, State) ->
 	#state{fd=FdSubLog, cbSize=Size, offset=Offset} = State,
-	%% ?MSG("Read ~p: fileNo=~p, offset=~p, size=~p fileNoLast=~p~n", [State#state.path, FileNo, Offset, Size, size(State#state.indexTable)]),
+	%% ?MSG("Read ~p: fileNo=~p, offset=~p, size=~p fileNoLast=~p~n", [?SELF, FileNo, Offset, Size, size(State#state.indexTable)]),
 	case catch(readSingle(FdSubLog, Size-Offset, N, Acc)) of
 		{ok, RestSize, Acc2} ->
 			{ok, Acc2, State#state{offset=Size-RestSize}};
@@ -377,7 +371,7 @@ init({Path, Client, FPermanent}) ->
 	ok = repairIndex(Path),
 	case catch (readIndex(Path)) of
 		{ok, IndexTable, Version} ->
-			?MSG("Init ~p: fileNoLast=~p version=~p~n", [Path, size(IndexTable), Version]),
+			?MSG("Init ~p: fileNoLast=~p version=~p~n", [?SELF, size(IndexTable), Version]),
 			State0 = #state{fd=0, fileNo=0, offset=0, cbSize=0,
 				path=Path, indexTable=IndexTable, version=Version, logW=?LogWServer(Path)},
 			%% Read pos file:
@@ -386,7 +380,7 @@ init({Path, Client, FPermanent}) ->
 				State1 = State0#state{fdPos=FdPos},
 				case file:read(FdPos, ?PosFileSize) of
 					{ok, <<?PosFileTag:32, FileNo:32, Offset:64>>} ->
-						?MSG("loadPosition ~p: fileNo=~p, offset=~p~n", [Path, FileNo, Offset]),
+						?MSG("LoadPosition ~p: fileNo=~p, offset=~p~n", [?SELF, FileNo, Offset]),
 						case positionNew(FileNo, Offset, State1) of
 							{reply, ok, State2} ->
 								{ok, State2};
@@ -407,7 +401,7 @@ init({Path, Client, FPermanent}) ->
 %% terminate: Termiate server.
 %%
 terminate(_Reason, State) ->
-	?MSG("Termiating ~p ...~n", [State#state.path]),
+	?MSG("Termiating ~p ...~n", [?SELF]),
 	case State#state.fdPos of
 		undefined ->
 			ok;
@@ -416,22 +410,23 @@ terminate(_Reason, State) ->
 	end.
 
 %%
-%% bchunk: Read log data.
-%% return: {ok, Acc, FromWhere} | !exception {need_repair, {FileNo, Offset}}
-%%	eof = (length(Acc) == 0)
-%%	Bins = lists:reverse(Acc)
+%% bget: Read log data.
+%% return: {ok, Bins, FromWhere} | eof | !exception {need_repair, {FileNo, Offset}}
 %%
-handle_call({bchunk, N}, _From, State) ->
+handle_call({get, N}, _From, State) ->
 	#state{fileNo=FileNo, offset=Offset} = State,
 	FromWhere = #position{fileNo=FileNo, offset=Offset},
 	case read(N, [], State) of
 		{ok, Acc2, State2} ->
-			if Acc2 =:= [] -> ok;
-			   true -> savePosition(State2) end,
-			{reply, {ok, Acc2, FromWhere}, State2};
-		Fail ->
-			%% ?MSG("Bchunk ~p: ~p~n", [State#state.path, Fail]),
-			{reply, Fail, State}
+			if Acc2 =:= [] ->
+				{reply, eof, State2};
+			true ->
+				savePosition(State2),
+				{reply, {ok, lists:reverse(Acc2), FromWhere}, State2}
+			end
+		%% Fail ->
+			%% ?MSG("Bchunk ~p: ~p~n", [?SELF, Fail]),
+			%% {reply, Fail, State}
 	end;
 
 %%
