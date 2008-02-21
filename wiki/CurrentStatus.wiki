@@ -13,7 +13,7 @@ Here we show you where we are going.
 
 == [2008-2-20] Implement a basic log system ==
 
-See issue #5.
+See [LogSystem documentation] and its development status: issue #5.
 
 == [2007-11-21] Erlang Inets ===
 
@@ -25,3 +25,4 @@ The following link is an introduction:
 == [2007-11-18] Erlana project is created ==
 
 See http://groups.google.com/group/erlang-china/browse_thread/thread/a6173d60882413ed
+

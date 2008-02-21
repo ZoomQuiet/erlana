@@ -15,7 +15,7 @@ logw:put("Logfile", <<"Test2">>).
 
 It will create a log file named "Logfile" (Logically. In fact, a directory named "Logfile" will be created). And write two log entries (<<"Test1">> and <<"Test2">>) to the log file.
 
-Erlana log system only support write binary data. If you want write any erlang term, use term_to_binary/1.
+Erlana log system only support to write binary data. If you want to write any erlang term, use term_to_binary/1.
 
 If you want to clear all data of a log file, just like this:
 {{{
