@@ -11,39 +11,39 @@ For more information, refer issue #5.
 = Write log =
 
 Erlana log system is easy to use. Here is an example code:
-{{
+{{{
 logw:put("LogFile", <<"Test1">>),
 logw:put("LogFile", <<"Test2">>).
-}}
+}}}
 
 It will create a log file named "LogFile" (Logically. In fact, a directory named "LogFile" will be created). And write two log entries (<<"Test1">> and <<"Test2">>) to the log file.
 
 Erlana log system only support write binary data. If you want write any erlang term, use term_to_binary/1.
 
 If you want to clear all data of a log file, just like this:
-{{
+{{{
 logw:trunc("LogFile").
-}}
+}}}
 
 = Read log =
 
 How to read log entries from a log file which created by logw module? You can use logr. Here is a simple example:
-{{
+{{{
 N = 2, %% How many entries to read.
 logr:get("LogFile", "Client1", N).
-}}
+}}}
 
 You will get a result like this:
-{{
+{{{
 {ok, [<<"Test1">>, <<"Test2">>], {position, {0, 0}}
-}}
+}}}
 
 It means you get two log entries (<<"Test1">>, <<"Test2">>) from position {0, 0} (that is, start of the log file).
 
 If you continue to call logr:get/3, EOF may be reached. An eof atom will be the result:
-{{
+{{{
 eof
-}}
+}}}
 
 You may notice that logr have a new concept: Client. The following will introduce it.
 
@@ -51,10 +51,11 @@ You may notice that logr have a new concept: Client. The following will introduc
 
 You know, At the same time a log file may read by many applications. And these applications are clients. NOTE: an application (that is, a client) may create many threads (or processes) to read the log file. Theses threads (or processes) have the same "read position". However, two applications should have two "read position", and do their works without interference.
 
-So, a client means a "read position". :)
+In one word, a client means a "read position".
 
 = Source code =
 
-* [http://code.google.com/p/erlana/source/browse/trunk/src/logr.erl logr.erl]
-* [http://code.google.com/p/erlana/source/browse/trunk/src/logw.erl logw.erl]
-* [http://code.google.com/p/erlana/source/browse/trunk/src/log.hrl log.hrl]
+ * [http://code.google.com/p/erlana/source/browse/trunk/src/logr.erl logr.erl]
+ * [http://code.google.com/p/erlana/source/browse/trunk/src/logw.erl logw.erl]
+ * [http://code.google.com/p/erlana/source/browse/trunk/src/log.hrl log.hrl]
+
