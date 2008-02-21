@@ -4,8 +4,8 @@
 -include_lib("kernel/include/file.hrl").
 
 %% export functions
--export([open/1, open/2, blog/2, trunc/1, sync/2, repair/3, close/1]).
--export([put/2, stop/1]).
+-export([open/1, open/2, blog/2, btrunc/1, sync/2, repair/3, close/1]).
+-export([put/2, trunc/1, stop/1]).
 
 %% required by 'gen_server' behaviour
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
@@ -14,6 +14,8 @@
 
 %% ------------------------------------------------------------------------------
 %% export functions
+
+-compile({inline,{blog,2}}).
 
 %%
 %% open: Open log file.
@@ -46,6 +48,18 @@ open(Path) ->
 %% trunc: empty a log file
 %% return: ok | {error, Reason}
 %%
+btrunc(Log) ->
+	gen_server:call(Log, trunc).
+	
+trunc(Path) when is_list(Path) ->
+	Log = ?LogWServer(Path),
+	case catch(gen_server:call(Log, trunc)) of
+		ok ->
+			ok;
+		_Fail ->
+			logw:open(Path, ?SUBLOG_MAX_BYTES),
+			catch(gen_server:call(Log, trunc))
+	end;
 trunc(Log) ->
 	gen_server:call(Log, trunc).
 

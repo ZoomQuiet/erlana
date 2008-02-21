@@ -63,8 +63,11 @@
 %% SUBLOG_MAX_BYTES: Configuration of a single logfile.
 
 -define(GBYTES, 1073741824). %% 1G
--define(GBYTES_X10, 10737418240).
--define(SUBLOG_MAX_BYTES, ?GBYTES_X10).
+-define(GBYTES_X2, 2147483648). %% 2G
+-define(GBYTES_X0_5, 536870912). %% 0.5G
+-define(GBYTES_X1_5, 1610612736). %% 1.5G
+-define(GBYTES_X10, 10737418240). %% 10G
+-define(SUBLOG_MAX_BYTES, ?GBYTES_X1_5).
 
 %% ------------------------------------------------------------------------------
 %% LogServer name
@@ -72,6 +75,8 @@
 -define(LogWServer(Path), list_to_atom("dc.log:" ++ Path)).
 -define(LogRServer(Log, Client), list_to_atom(lists:flatten(["dc.log:", Log, ":", Client]))).
 -define(IsRunning(ServName), lists:member(ServName, registered())).
+
+-define(SELF, element(2, erlang:process_info(self(), registered_name))). %% Atom
 
 %% ------------------------------------------------------------------------------
 
