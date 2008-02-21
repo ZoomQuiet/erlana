@@ -46,9 +46,11 @@ You may notice that logr have a new concept: Client. The following will introduc
 
 == What is a Client? ==
 
-You know, At the same time a log file may read by many applications. And these applications are clients. NOTE: an application (that is, a client) may create many threads (or processes) to read the log file. Theses threads (or processes) have the same "read position". However, two applications should have two "read position", and do their works without interference.
+You know, At the same time a log file may be read by many applications. And these applications are clients.
 
-In one word, a client means a "read position".
+NOTE: an application (that is, a client) may create many threads (or processes) to read the log file. Theses threads (or processes) have the same "read position". However, two applications should have two "read position", and do their works without interference.
+
+So, In one word, a client means a "read position".
 
 To get current "read position" of a client, you can use the following code:
 {{{
