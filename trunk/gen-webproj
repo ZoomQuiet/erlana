@@ -1,0 +1,5 @@
+if [ -d erlana ]; then
+    echo "Erlana web project is generated already."
+else
+    escript mochiweb/scripts/new_mochiweb.erl erlana
+fi
