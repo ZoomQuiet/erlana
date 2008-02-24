@@ -24,7 +24,7 @@ get-mochiweb:
 
 up-mochiweb: mochiweb
 	@if [ -d mochiweb ]; then \
-	    cd mochiweb; \
+		cd mochiweb; \
 		svn up; \
 		make; \
 		cp ebin/*.* ../ebin/; \
