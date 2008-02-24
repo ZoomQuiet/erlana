@@ -1,3 +1,0 @@
-rm -rf mochiweb
-svn co http://mochiweb.googlecode.com/svn/trunk mochiweb
-
