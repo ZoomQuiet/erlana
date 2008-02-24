@@ -1,0 +1,9 @@
+if [ -d mochiweb ]; then
+    cd mochiweb
+    svn up
+    make
+    cp ebin/*.* ../ebin/
+fi
+
+
+
