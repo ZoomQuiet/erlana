@@ -1,6 +1,6 @@
 {
 	[
-		'src/*'
+		'src/log/*'
 	], 
 	[
 		debug_info, 
