@@ -73,7 +73,7 @@ And, you can seek "read position" to start of log file, by using logr:reset/2:
 logr:reset("Logfile", "Client1").
 }}}
 
-= Log Settings ==
+= Log settings ==
 
 == basePath ==
 
