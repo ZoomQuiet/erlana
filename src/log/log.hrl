@@ -3,6 +3,12 @@
 
 -define(READ_AHEAD_SIZE, 65536).
 
+-define(LOGDATA_BASE_PATH,
+	case os:getenv("LogDataBasePath") of
+		false -> ".";
+		LogDataBasePath -> LogDataBasePath
+	end).
+
 %% ------------------------------------------------------------------------------
 %% IndexFile on disk
 
@@ -73,7 +79,7 @@
 %% LogServer name
 
 -define(LogWServer(Path), list_to_atom("dc.log:" ++ Path)).
--define(LogRServer(Log, Client), list_to_atom(lists:flatten(["dc.log:", Log, ":", Client]))).
+-define(LogRServer(Path, Client), list_to_atom(lists:flatten(["dc.log:", Path, ":", Client]))).
 -define(IsRunning(ServName), lists:member(ServName, registered())).
 
 -define(SELF, element(2, erlang:process_info(self(), registered_name))). %% Atom
