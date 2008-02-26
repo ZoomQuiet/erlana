@@ -77,7 +77,7 @@ logr:reset("Logfile", "Client1").
 
 == basePath ==
 
-As default, log system (see  issue #5) put log file into current directory. But you can reconfigure the base data path by set a environment variable:
+As default, log system (see  issue #5) put log file into current directory. But you can reconfigure the base data path by setting a environment variable:
 {{{
 export LogDataBasePath=/home/my/logdata
 }}}
