@@ -101,6 +101,6 @@ You should check where is wrong. For example, maybe you make a typo.
 
 = Source code =
 
- * [http://code.google.com/p/erlana/source/browse/trunk/src/logr.erl logr.erl]
- * [http://code.google.com/p/erlana/source/browse/trunk/src/logw.erl logw.erl]
- * [http://code.google.com/p/erlana/source/browse/trunk/src/log.hrl log.hrl]
+ * [http://code.google.com/p/erlana/source/browse/trunk/src/log/logr.erl logr.erl]
+ * [http://code.google.com/p/erlana/source/browse/trunk/src/log/logw.erl logw.erl]
+ * [http://code.google.com/p/erlana/source/browse/trunk/src/log/log.hrl log.hrl]
