@@ -73,9 +73,34 @@ And, you can seek "read position" to start of log file, by using logr:reset/2:
 logr:reset("Logfile", "Client1").
 }}}
 
+= Log Settings ==
+
+== basePath ==
+
+As default, log system (see  issue #5) put log file into current directory. But you can reconfigure the base data path by set a environment variable:
+{{{
+export LogDataBasePath=/home/my/logdata
+}}}
+
+After doing this, you can enter erlang shell, and use the following code to ensure your change is affected:
+{{{
+logr:i().
+}}}
+
+If you see the following output:
+{{{
+[{basePath, "/home/my/logdata"}]
+}}}
+
+Congratulations for the success. If you see the following output:
+{{{
+[{basePath, "."}]
+}}}
+
+You should check where is wrong. For example, maybe you make a typo.
+
 = Source code =
 
  * [http://code.google.com/p/erlana/source/browse/trunk/src/logr.erl logr.erl]
  * [http://code.google.com/p/erlana/source/browse/trunk/src/logw.erl logw.erl]
  * [http://code.google.com/p/erlana/source/browse/trunk/src/log.hrl log.hrl]
-
