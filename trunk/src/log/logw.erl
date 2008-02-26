@@ -10,7 +10,18 @@
 %% required by 'gen_server' behaviour
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
--record(state, {fd, fdIdx, path, fileNo, cbSize, cbMaxSize, version, fDirty=false, nRef=1}).
+-record(state,
+{
+	fd,			%% file_description - Current SubLog File Description
+	fdIdx,		%% file_description - LogIndexFile File Description
+	path,		%% string - Path of Log File, with LogDataBasePath joined
+	fileNo,		%% int - Current SubLog FileNo
+	cbSize,		%% int64 - Current SubLog FileSize
+	cbMaxSize,	%% int64 - SubLog Limited Size (MaxSize)
+	version,	%% int - Version of Log File
+	fDirty = false,	%% bool - Changed or not
+	nRef = 1		%% int - Reference count of LogWServer
+}).
 
 %% ------------------------------------------------------------------------------
 %% export functions
@@ -22,12 +33,13 @@
 %% return: {ok, Log} | {error, Reason}
 %%
 open(Path, MaxSize) ->
-	case filelib:ensure_dir(?IndexFilePath(Path)) of
+	PathWithBase = filename:join(?LOGDATA_BASE_PATH, Path),
+	case filelib:ensure_dir(?IndexFilePath(PathWithBase)) of
 		ok ->
 			Log = ?LogWServer(Path),
 			case catch (gen_server:start_link(
 				_ServName = {local, Log},
-				_ModCallback = ?MODULE,	_Arg = {Path, MaxSize}, _Options = [])
+				_ModCallback = ?MODULE,	_Arg = {PathWithBase, MaxSize}, _Options = [])
 			) of
 				{ok, _Pid} ->
 					{ok, Log};

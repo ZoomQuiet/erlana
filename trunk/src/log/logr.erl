@@ -6,7 +6,7 @@
 %% export functions
 -export([open/2, open/3, bget/2, bcount/1, btell/1, blist/1, position/2, reset/1, i/1, close/1]).
 -export([get/3, tell/2, position/3, reset/2, i/2, close/2]).
--export([repair/3, repairIndex/1]).
+-export([repair/3, repairIndex/1, i/0]).
 
 %% required by 'gen_server' behaviour
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
@@ -22,7 +22,8 @@
 	indexTable,	%% tuple of int64 - Index Table.
 	version,	%% int - Version of LogFile
 
-	path,		%% string - Path of LogFile
+	path_with_base,		%% string - Path of LogFile, with LogDataBasePath joined
+	path_without_base,	%% string - Path of LogFile, without LogDataBasePath joined
 	logW,		%% atom - Registered Name of logw server
 	fdPos		%% file_description - PosFile File Description
 }).
@@ -151,7 +152,7 @@ i(Log) ->
 	
 i(Path, Client) ->
 	i(?LogRServer(Path, Client)).
-
+	
 %%
 %% open: Close log file.
 %% return: ok | {error, Reason}
@@ -185,6 +186,12 @@ repairIndex(Path) ->
 	logw:close(LogWServer),
 	ok.
 
+%%
+%% i: Settings of logger.
+%%
+i() ->
+	[{basePath, ?LOGDATA_BASE_PATH}].
+
 %% ------------------------------------------------------------------------------
 %% callback functions
 
@@ -197,16 +204,16 @@ readIndex(Path) ->
 	IndexFile = ?IndexFilePath(Path),
 	case file:read_file(IndexFile) of
 		{ok, <<?IndexFileHeadTag:32, Version:32, Binary/binary>>} ->
-			{ok, Acc} = readIndex(Path, Binary, 1, []),
+			{ok, Acc} = readIndex(Binary, 1, []),
 			IndexTable = erlang:list_to_tuple(lists:reverse(Acc)),
 			{ok, IndexTable, Version};
 		{error, Reason} ->
 			{error, Reason}
 	end.
 
-readIndex(Path, <<?IndexFileTag:32, FileNo:32, Size:64, RestBin/binary>>, FileNo, Acc) ->
-	readIndex(Path, RestBin, FileNo+1, [Size | Acc]);
-readIndex(_Path, <<>>, _FileNo, Acc) ->
+readIndex(<<?IndexFileTag:32, FileNo:32, Size:64, RestBin/binary>>, FileNo, Acc) ->
+	readIndex(RestBin, FileNo+1, [Size | Acc]);
+readIndex(<<>>, _FileNo, Acc) ->
 	{ok, Acc}.
 
 %%
@@ -228,7 +235,7 @@ update(FileNo, OldSize, State) ->
 							{update, State#state{cbSize=FileSizeCur, indexTable=IndexTable}}
 					end;
 				true ->
-					{ok, IndexTable2, Version2} = readIndex(State#state.path),
+					{ok, IndexTable2, Version2} = readIndex(State#state.path_with_base),
 					State2 = State#state{indexTable = IndexTable2, version=Version2},
 					case element(FileNo, IndexTable2) of
 						OldSize -> %% no more data, but have next sublog file.
@@ -245,7 +252,7 @@ update(FileNo, OldSize, State) ->
 			true -> %% trunc
 				?MSG0("Truncated.~n"),
 				file:close(State#state.fd),
-				{ok, IndexTable2, Version2} = readIndex(State#state.path),
+				{ok, IndexTable2, Version2} = readIndex(State#state.path_with_base),
 				State2 = State#state{fd=0, fileNo=0, offset=0, cbSize=0, indexTable=IndexTable2, version=Version2},
 				{update, State2}
 			end;
@@ -276,7 +283,7 @@ positionNew(FileNo, Offset, State) ->
 		Offset > Size ->
 			{reply, {error, out_of_range}, State};
 		true ->
-			SubLogFile = ?SubLogPath(State#state.path, FileNo),
+			SubLogFile = ?SubLogPath(State#state.path_with_base, FileNo),
 			case file:open(SubLogFile, ?SubLogReadMode) of
 				{ok, FdSubLog} ->
 					if Offset =:= 0 -> ok;
@@ -292,17 +299,19 @@ positionNew(FileNo, Offset, State) ->
 positionTo(NewPosition, State) ->
 	#state{cbSize=Size, fileNo=FileNo} = State,
 	#position{offset=NewOffset, fileNo=NewFileNo} = NewPosition,
-	if
-		NewFileNo =:= FileNo ->
-			if
-				NewOffset > Size ->
-					{reply, {error, out_of_range}, State};
-				true ->
-					{ok, NewOffset} = file:position(State#state.fd, NewOffset),
-					{reply, ok, State#state{offset=NewOffset}}
-			end;
+	if NewFileNo =:= FileNo ->
+		if NewOffset > Size ->
+			{reply, {error, out_of_range}, State};
+		true ->
+			{ok, NewOffset} = file:position(State#state.fd, NewOffset),
+			{reply, ok, State#state{offset=NewOffset}}
+		end;
+	true ->
+		if NewFileNo =:= 0 ->
+			positionNew(1, 0, State);
 		true ->
 			positionNew(NewFileNo, NewOffset, State)
+		end
 	end.
 
 %%
@@ -358,7 +367,7 @@ read(N, Acc, State) ->
 					end
 			end;
 		_Fail ->
-			ok = repair(State#state.path, State#state.fileNo, Offset),
+			ok = repair(State#state.path_without_base, State#state.fileNo, Offset),
 			file:position(FdSubLog, Offset),
 			read(N, Acc, State)
 	end.
@@ -369,14 +378,16 @@ read(N, Acc, State) ->
 init({Path, Client, FPermanent}) ->
 	%% Read index from file:
 	ok = repairIndex(Path),
-	case catch (readIndex(Path)) of
+	PathWithBase = filename:join(?LOGDATA_BASE_PATH, Path),
+	case catch (readIndex(PathWithBase)) of
 		{ok, IndexTable, Version} ->
 			?MSG("Init ~p: fileNoLast=~p version=~p~n", [?SELF, size(IndexTable), Version]),
 			State0 = #state{fd=0, fileNo=0, offset=0, cbSize=0,
-				path=Path, indexTable=IndexTable, version=Version, logW=?LogWServer(Path)},
+				path_with_base=PathWithBase, path_without_base=Path,
+				indexTable=IndexTable, version=Version, logW=?LogWServer(Path)},
 			%% Read pos file:
 			if FPermanent =:= true ->
-				{ok, FdPos} = file:open(?PosFilePath(Path, Client), ?PosReadWriteMode),
+				{ok, FdPos} = file:open(?PosFilePath(PathWithBase, Client), ?PosReadWriteMode),
 				State1 = State0#state{fdPos=FdPos},
 				case file:read(FdPos, ?PosFileSize) of
 					{ok, <<?PosFileTag:32, FileNo:32, Offset:64>>} ->
@@ -451,7 +462,7 @@ handle_call({position, NewPosition}, _From, State) ->
 %% return: {ok, [Info]} | {error, Reason}
 %%
 handle_call(i, _From, State) ->
-	#state{fileNo=FileNo, offset=Offset, path=Path, indexTable=IndexTable, version=Version, fdPos=FdPos} = State,
+	#state{fileNo=FileNo, offset=Offset, path_without_base=Path, indexTable=IndexTable, version=Version, fdPos=FdPos} = State,
 	Info = [
 		#position{offset=Offset, fileNo=FileNo},
 		{index, IndexTable}, {path, Path}, {version, Version}, {permanent, FdPos =/= undefined}
