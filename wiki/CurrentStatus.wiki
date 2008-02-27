@@ -11,6 +11,10 @@ To get more details, see http://code.google.com/p/erlana/issues/list.
 
 Here we show you where we are going.
 
+== [2008-2-27] Mochiweb vs inets httpd ==
+
+See issue #6. Mochiweb (http://code.google.com/p/mochiweb/) is fitter for Erlana than inets httpd.
+
 == [2008-2-20] Implement a basic log system ==
 
 See [LogSystem documentation] and its development status: issue #5.
