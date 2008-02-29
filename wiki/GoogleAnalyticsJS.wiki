@@ -1,5 +1,5 @@
 #summary Dive into Google Analytics JavaScript.
-#labels GoogleAnalytics,JavaScript,Requirement
+#labels GoogleAnalytics,JavaScript,Requirement,Featured,Phase-Requirements
 
 = Introduction =
 
