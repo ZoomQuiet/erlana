@@ -35,7 +35,7 @@
 open(Path, MaxSize) ->
 	PathWithBase = filename:join(?LOGDATA_BASE_PATH, Path),
 	case filelib:ensure_dir(?IndexFilePath(PathWithBase)) of
-		ok ->
+		Return when Return =:= ok; Return =:= {error,eexist} ->
 			Log = ?LogWServer(Path),
 			case catch (gen_server:start_link(
 				_ServName = {local, Log},
@@ -50,7 +50,8 @@ open(Path, MaxSize) ->
 					{error, Fail}
 			end;
 		Fail ->
-			 Fail
+			?MSG("logw: ensure_dir ~p failed: ~p~n", [PathWithBase, Fail]),
+			Fail
 	end.
 
 open(Path) ->
