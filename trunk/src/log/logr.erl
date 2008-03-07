@@ -11,7 +11,7 @@
 %% required by 'gen_server' behaviour
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
--record(position, {fileNo, offset}).
+-record(position, {fileNo, offset, version}).
 -record(state,
 {
 	fd,			%% file_description - Current SubLog File Description
@@ -34,6 +34,7 @@
 -compile({inline,{bget,2}}).
 -compile({inline,{btell,1}}).
 -compile({inline,{position,2}}).
+-compile({inline,{reset,1}}).
 
 %%
 %% open: Open log file.
@@ -121,10 +122,16 @@ position(Path, Client, Position) ->
 	end.
 
 reset(Log) ->
-	position(Log, #position{fileNo=1, offset=0}).
+	gen_server:call(Log, reset).
 
 reset(Path, Client) ->
-	position(Path, Client, #position{fileNo=1, offset=0}).
+	Log = ?LogRServer(Path, Client),
+	case catch (reset(Log)) of
+		ok -> ok;
+		_Fail ->
+			open(Path, Client, true),
+			catch (reset(Log))
+	end.
 
 %%
 %% tell: Tell current position.
@@ -169,7 +176,7 @@ close(Path, Client) ->
 
 %%
 %% repair: Repair a sublog file.
-%% return: ok | {error, Reason}
+%% return: {ok, GoodSize, FileSize} | {error, Reason}
 %%
 repair(Path, FileNo, Offset) ->
 	{ok, LogWServer} = logw:open(Path, ?SUBLOG_MAX_BYTES),
@@ -268,9 +275,9 @@ savePosition(State) ->
 		undefined ->
 			ok;
 		FdPos ->
-			#state{fileNo=FileNo, offset=Offset} = State,
-			?MSG("SavePosition ~p: fileNo=~p, offset=~p~n", [?SELF, FileNo, Offset]),
-			ok = file:pwrite(FdPos, 0, <<?PosFileTag:32, FileNo:32, Offset:64>>)
+			#state{fileNo=FileNo, offset=Offset, version=Version} = State,
+			?MSG("SavePosition ~p: fileNo=~p, offset=~p, version=~p~n", [?SELF, FileNo, Offset, Version]),
+			ok = file:pwrite(FdPos, 0, <<?PosFileTag:32, FileNo:32, Offset:64, Version:32>>)
 	end.
 
 %%
@@ -296,21 +303,29 @@ positionNew(FileNo, Offset, State) ->
 			end
 	end.
 
-positionTo(NewPosition, State) ->
-	#state{cbSize=Size, fileNo=FileNo} = State,
-	#position{offset=NewOffset, fileNo=NewFileNo} = NewPosition,
-	if NewFileNo =:= FileNo ->
-		if NewOffset > Size ->
-			{reply, {error, out_of_range}, State};
-		true ->
-			{ok, NewOffset} = file:position(State#state.fd, NewOffset),
-			{reply, ok, State#state{offset=NewOffset}}
-		end;
-	true ->
-		if NewFileNo =:= 0 ->
+positionTo(NewPosition, FTolerance, State) ->
+	#state{cbSize=Size, fileNo=FileNo, version=Version} = State,
+	#position{offset=NewOffset, fileNo=NewFileNo, version=NewVersion} = NewPosition,
+	if NewVersion =/= Version ->
+		if FTolerance =:= true ->
 			positionNew(1, 0, State);
 		true ->
-			positionNew(NewFileNo, NewOffset, State)
+			{reply, {error, out_of_range}, State}
+		end;
+	true ->
+		if NewFileNo =:= FileNo ->
+			if NewOffset > Size ->
+				{reply, {error, out_of_range}, State};
+			true ->
+				{ok, NewOffset} = file:position(State#state.fd, NewOffset),
+				{reply, ok, State#state{offset=NewOffset}}
+			end;
+		true ->
+			if NewFileNo =:= 0 ->
+				positionNew(1, 0, State);
+			true ->
+				positionNew(NewFileNo, NewOffset, State)
+			end
 		end
 	end.
 
@@ -367,7 +382,7 @@ read(N, Acc, State) ->
 					end
 			end;
 		_Fail ->
-			ok = repair(State#state.path_without_base, State#state.fileNo, Offset),
+			{ok, _, _} = repair(State#state.path_without_base, State#state.fileNo, Offset),
 			file:position(FdSubLog, Offset),
 			read(N, Acc, State)
 	end.
@@ -390,9 +405,10 @@ init({Path, Client, FPermanent}) ->
 				{ok, FdPos} = file:open(?PosFilePath(PathWithBase, Client), ?PosReadWriteMode),
 				State1 = State0#state{fdPos=FdPos},
 				case file:read(FdPos, ?PosFileSize) of
-					{ok, <<?PosFileTag:32, FileNo:32, Offset:64>>} ->
-						?MSG("LoadPosition ~p: fileNo=~p, offset=~p~n", [?SELF, FileNo, Offset]),
-						case positionNew(FileNo, Offset, State1) of
+					{ok, <<?PosFileTag:32, FileNo:32, Offset:64, Version:32>>} ->
+						Position = #position{fileNo=FileNo, offset=Offset, version=Version},
+						?MSG("LoadPosition ~p: ~p~n", [?SELF, Position]),
+						case positionTo(Position, false, State1) of
 							{reply, ok, State2} ->
 								{ok, State2};
 							{reply, Fail, _State} ->
@@ -425,8 +441,8 @@ terminate(_Reason, State) ->
 %% return: {ok, Bins, FromWhere} | eof | !exception {need_repair, {FileNo, Offset}}
 %%
 handle_call({get, N}, _From, State) ->
-	#state{fileNo=FileNo, offset=Offset} = State,
-	FromWhere = #position{fileNo=FileNo, offset=Offset},
+	#state{fileNo=FileNo, offset=Offset, version=Version} = State,
+	FromWhere = #position{fileNo=FileNo, offset=Offset, version=Version},
 	case read(N, [], State) of
 		{ok, Acc2, State2} ->
 			if Acc2 =:= [] ->
@@ -445,15 +461,20 @@ handle_call({get, N}, _From, State) ->
 %% return: {ok, Position} | {error, Reason}
 %%
 handle_call(tell, _From, State) ->
-	#state{fileNo=FileNo, offset=Offset} = State,
-	{reply, {ok, #position{fileNo=FileNo, offset=Offset}}, State};
+	#state{fileNo=FileNo, offset=Offset, version=Version} = State,
+	{reply, {ok, #position{fileNo=FileNo, offset=Offset, version=Version}}, State};
 
 %%
 %% position: Seek to new position.
 %% return: ok | {error, Reason}
 %%
 handle_call({position, NewPosition}, _From, State) ->
-	{reply, Ret, State2} = positionTo(NewPosition, State),
+	{reply, Ret, State2} = positionTo(NewPosition, false, State),
+	if Ret =:= ok -> savePosition(State2); true -> ok end,
+	{reply, Ret, State2};
+
+handle_call(reset, _From, State) ->
+	{reply, Ret, State2} = positionTo(#position{fileNo=0, offset=0, version=0}, true, State),
 	if Ret =:= ok -> savePosition(State2); true -> ok end,
 	{reply, Ret, State2};
 
@@ -464,7 +485,7 @@ handle_call({position, NewPosition}, _From, State) ->
 handle_call(i, _From, State) ->
 	#state{fileNo=FileNo, offset=Offset, path_without_base=Path, indexTable=IndexTable, version=Version, fdPos=FdPos} = State,
 	Info = [
-		#position{offset=Offset, fileNo=FileNo},
+		#position{offset=Offset, fileNo=FileNo, version=Version},
 		{index, IndexTable}, {path, Path}, {version, Version}, {permanent, FdPos =/= undefined}
 		],
 	{reply, {ok, Info}, State};

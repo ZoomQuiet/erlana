@@ -31,13 +31,13 @@
 %% PosFile on disk
 
 %%
-%% fileFormat => PosFileTag:dword FileNo:dword Offset:qword
+%% fileFormat => PosFileTag:dword FileNo:dword Offset:qword Version:dword
 %%
 
 -define(PosFilePath(Path, Client), filename:join(Path, Client ++ ".pos")).
 -define(PosFileTag, 3978514931). %% 0xED2351F3
 -define(PosReadWriteMode, [read, write, raw, binary]).
--define(PosFileSize, 16).
+-define(PosFileSize, 20).
 
 %% ------------------------------------------------------------------------------
 %% SubLogFile on disk
