@@ -408,7 +408,7 @@ init({Path, Client, FPermanent}) ->
 					{ok, <<?PosFileTag:32, FileNo:32, Offset:64, Version:32>>} ->
 						Position = #position{fileNo=FileNo, offset=Offset, version=Version},
 						?MSG("LoadPosition ~p: ~p~n", [?SELF, Position]),
-						case positionTo(Position, false, State1) of
+						case positionTo(Position, true, State1) of
 							{reply, ok, State2} ->
 								{ok, State2};
 							{reply, Fail, _State} ->
